@@ -265,7 +265,7 @@ public class AssetBundler
         int apiCompatibilityLevel = 1; //NET_2_0 compatibility level is enum value 1
         Assembly assembly = Assembly.GetAssembly(typeof(MonoScript));
         var monoIslandType = assembly.GetType("UnityEditor.Scripting.MonoIsland");
-        object monoIsland = Activator.CreateInstance(monoIslandType, BuildTarget.StandaloneOSXUniversal, apiCompatibilityLevel, scriptArray, referenceArray, defineArray, outputFilename);
+        object monoIsland = Activator.CreateInstance(monoIslandType, BuildTarget.StandaloneOSX, apiCompatibilityLevel, scriptArray, referenceArray, defineArray, outputFilename);
 
         //MonoCompiler itself
         var monoCompilerType = assembly.GetType("UnityEditor.Scripting.Compilers.MonoCSharpCompiler");
@@ -423,7 +423,7 @@ public class AssetBundler
         BuildPipeline.BuildAssetBundles(
            TEMP_BUILD_FOLDER,
            BuildAssetBundleOptions.DeterministicAssetBundle | BuildAssetBundleOptions.CollectDependencies,
-           BuildTarget.StandaloneOSXUniversal);
+           BuildTarget.StandaloneOSX);
 #pragma warning restore 618
 
         //We are only interested in the BUNDLE_FILENAME bundle (and not the extra AssetBundle or the manifest files
