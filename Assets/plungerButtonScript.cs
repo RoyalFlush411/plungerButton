@@ -1,7 +1,6 @@
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using UnityEngine;
 using plungerButton;
 
@@ -165,6 +164,57 @@ public class plungerButtonScript : MonoBehaviour
         {
             Debug.LogFormat("[The Plunger Button #{0}] Strike! Incorrect response.", moduleId);
             GetComponent<KMBombModule>().HandleStrike();
+        }
+    }
+
+    private string TwitchHelpMessage = "Hold the button by using !{0} hold on 0, and release the button by using !{0} release on 0";
+
+    IEnumerator ProcessTwitchCommand(string command)
+    {
+        command = command.ToLowerInvariant();
+        var match = Regex.Match(command, "^(hold|release) on ([0-9])$");
+        var chainMatch = Regex.Match(command, "^(hold on|submit) ([0-9])(?:;|,|)(?: |)(?:release on |)([0-9])$");
+        if (!match.Success && !chainMatch.Success)
+            yield break;
+        yield return null;
+        var time = match.Success ? match.Groups[2].Value : chainMatch.Groups[2].Value;
+        while (Mathf.FloorToInt(Bomb.GetTime() % 60 % 10) != int.Parse(time))
+            yield return string.Format("trycancel The Plunger button was not {0} due to a request to cancel.", pressed ? "released" : "pressed");
+        if (chainMatch.Success)
+        {
+            yield return button;
+            time = chainMatch.Groups[3].Value;
+            while (Mathf.FloorToInt(Bomb.GetTime() % 60 % 10) != int.Parse(time))
+                yield return string.Format("trycancel The Plunger button was not released due to a request to cancel.");
+        }
+        yield return button;
+    }
+
+    IEnumerator TwitchHandleForcedSolve()
+    {
+        if (pressed)
+        {
+            pressed = !pressed;
+            GetComponent<KMAudio>().PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.BigButtonRelease, transform);
+            button.AddInteractionPunch();
+            buttonAnimation.SetBool("press", false);
+            buttonAnimation.SetBool("release", true);
+        }
+        yield return null;
+        yield return HoldButton(ProcessTwitchCommand("hold on " + targetPressTime), true);
+        yield return HoldButton(ProcessTwitchCommand("release on " + targetReleaseTime), false);
+    }
+
+    IEnumerator HoldButton(IEnumerator coroutine, bool hold)
+    {
+        while (coroutine.MoveNext())
+        {
+            var obj = coroutine.Current;
+            if (obj is KMSelectable && hold)
+                button.OnInteract();
+            else if (obj is KMSelectable)
+                button.OnInteractEnded();
+            yield return obj;
         }
     }
 }
