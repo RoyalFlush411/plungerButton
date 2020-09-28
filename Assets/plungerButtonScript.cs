@@ -167,7 +167,7 @@ public class plungerButtonScript : MonoBehaviour
         }
     }
 
-    private string TwitchHelpMessage = "Hold the button by using !{0} hold on 0, and release the button by using !{0} release on 0";
+    private string TwitchHelpMessage = "Hold and release the button by using !{0} hold on 0, release on 0";
 
     IEnumerator ProcessTwitchCommand(string command)
     {
