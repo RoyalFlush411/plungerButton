@@ -174,18 +174,30 @@ public class plungerButtonScript : MonoBehaviour
         command = command.ToLowerInvariant();
         var match = Regex.Match(command, "^(hold|release) on ([0-9])$");
         var chainMatch = Regex.Match(command, "^(hold on|submit) ([0-9])(?:;|,|)(?: |)(?:release on |)([0-9])$");
+        var isHeld = match.Success ? match.Groups[1].Value == "release" : false;
         if (!match.Success && !chainMatch.Success)
             yield break;
+        if (match.Success && isHeld != pressed)
+        {
+            string error = pressed ? "is already being held!" : "has not been held yet.";
+            yield return "sendtochaterror The Plunger Button " + error;
+            yield break;
+        }
         yield return null;
         var time = match.Success ? match.Groups[2].Value : chainMatch.Groups[2].Value;
-        while (Mathf.FloorToInt(Bomb.GetTime() % 60 % 10) != int.Parse(time))
-            yield return string.Format("trycancel The Plunger button was not {0} due to a request to cancel.", pressed ? "released" : "pressed");
+        System.Func<bool> doesTimeMatch = () => Mathf.FloorToInt(Bomb.GetTime() % 60 % 10) == int.Parse(time);
+        bool mustDelay = doesTimeMatch();
+        while (mustDelay || !doesTimeMatch())
+        {
+            if (!doesTimeMatch()) mustDelay = false;
+            yield return string.Format("trycancel The Plunger Button was not {0} due to a request to cancel.", pressed ? "released" : "held");
+        }
         if (chainMatch.Success)
         {
             yield return button;
             time = chainMatch.Groups[3].Value;
-            while (Mathf.FloorToInt(Bomb.GetTime() % 60 % 10) != int.Parse(time))
-                yield return string.Format("trycancel The Plunger button was not released due to a request to cancel.");
+            while (!doesTimeMatch())
+                yield return string.Format("trycancel The Plunger Button was not released due to a request to cancel.");
         }
         yield return button;
     }
