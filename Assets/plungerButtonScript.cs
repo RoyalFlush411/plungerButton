@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -26,6 +27,8 @@ public class plungerButtonScript : MonoBehaviour
     private int targetReleaseTime = 0;
     private bool pressed;
 
+    private KMBombModule module;
+
     public Material[] discoColours;
     public Renderer surface;
     public Material blackMat;
@@ -40,6 +43,7 @@ public class plungerButtonScript : MonoBehaviour
         moduleId = moduleIdCounter++;
         button.OnInteract += delegate () { PressButton(); return false; };
         button.OnInteractEnded += delegate () { ReleaseButton();};
+        module = GetComponent<KMBombModule>();
     }
 
     void Update()
@@ -141,6 +145,14 @@ public class plungerButtonScript : MonoBehaviour
         CheckInput();
     }
 
+    void PanicAtThe()
+    {
+        Debug.LogFormat("<The Plunger Button #{0}> The module has been prematurely solved.");
+        moduleSolved = true;
+        module.HandlePass();
+        StopAllCoroutines();
+    }
+
     IEnumerator Disco()
     {
         while(pressed)
@@ -158,12 +170,12 @@ public class plungerButtonScript : MonoBehaviour
         {
             moduleSolved = true;
             Debug.LogFormat("[The Plunger Button #{0}] Correct response. Module solved.", moduleId);
-            GetComponent<KMBombModule>().HandlePass();
+            module.HandlePass();
         }
         else
         {
             Debug.LogFormat("[The Plunger Button #{0}] Strike! Incorrect response.", moduleId);
-            GetComponent<KMBombModule>().HandleStrike();
+            module.HandleStrike();
         }
     }
 
@@ -185,11 +197,9 @@ public class plungerButtonScript : MonoBehaviour
         }
         yield return null;
         var time = match.Success ? match.Groups[2].Value : chainMatch.Groups[2].Value;
-        System.Func<bool> doesTimeMatch = () => Mathf.FloorToInt(Bomb.GetTime() % 60 % 10) == int.Parse(time);
-        bool mustDelay = doesTimeMatch();
-        while (mustDelay || !doesTimeMatch())
+        Func<bool> doesTimeMatch = () => Mathf.FloorToInt(Bomb.GetTime() % 60 % 10) == int.Parse(time);
+        while (!doesTimeMatch())
         {
-            if (!doesTimeMatch()) mustDelay = false;
             yield return string.Format("trycancel The Plunger Button was not {0} due to a request to cancel.", pressed ? "released" : "held");
         }
         if (chainMatch.Success)
@@ -204,29 +214,23 @@ public class plungerButtonScript : MonoBehaviour
 
     IEnumerator TwitchHandleForcedSolve()
     {
-        if (pressed)
+        Func<int> GetSecond = () => Mathf.FloorToInt(Bomb.GetTime() % 60 % 10);
+        if (!pressed)
         {
-            pressed = !pressed;
-            GetComponent<KMAudio>().PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.BigButtonRelease, transform);
-            button.AddInteractionPunch();
-            buttonAnimation.SetBool("press", false);
-            buttonAnimation.SetBool("release", true);
+            while (GetSecond() != targetPressTime)
+                yield return true;
+            button.OnInteract();
         }
-        yield return null;
-        yield return HoldButton(ProcessTwitchCommand("hold on " + targetPressTime), true);
-        yield return HoldButton(ProcessTwitchCommand("release on " + targetReleaseTime), false);
-    }
-
-    IEnumerator HoldButton(IEnumerator coroutine, bool hold)
-    {
-        while (coroutine.MoveNext())
+        while (GetSecond() != targetReleaseTime)
+            yield return true;
+        if (timeOfPress != targetPressTime)
         {
-            var obj = coroutine.Current;
-            if (obj is KMSelectable && hold)
-                button.OnInteract();
-            else if (obj is KMSelectable)
-                button.OnInteractEnded();
-            yield return obj;
+            // The module is in an unsolvable state and so we panic and halt the autosolver.
+            // In TP terms this just means HandlePass and yield break.
+            // Apologies for the unnecessary Panic at the Disco reference
+            PanicAtThe();
+            yield break;
         }
+        button.OnInteractEnded();
     }
 }
