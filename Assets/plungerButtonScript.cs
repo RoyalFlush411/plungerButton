@@ -26,6 +26,7 @@ public class plungerButtonScript : MonoBehaviour
     private int targetPressTime = 0;
     private int targetReleaseTime = 0;
     private bool pressed;
+    private bool heldCorrectly;
 
     private KMBombModule module;
 
@@ -121,6 +122,7 @@ public class plungerButtonScript : MonoBehaviour
         GetComponent<KMSelectable>().AddInteractionPunch();
         timeOfPress = (Bomb.GetTime() % 60) % 10;
         timeOfPress = Mathf.FloorToInt(timeOfPress);
+        heldCorrectly = timeOfPress == targetPressTime;
         Debug.LogFormat("[The Plunger Button #{0}] Current solved modules: {1}. Target press time: {2}. Actual press time: {3}.", moduleId, solvedModules, targetPressTime, timeOfPress);
         buttonAnimation.SetBool("release", false);
         buttonAnimation.SetBool("press", true);
@@ -166,7 +168,7 @@ public class plungerButtonScript : MonoBehaviour
 
     void CheckInput()
     {
-        if(targetPressTime == timeOfPress && targetReleaseTime == timeOfRelease)
+        if(heldCorrectly && targetReleaseTime == timeOfRelease)
         {
             moduleSolved = true;
             Debug.LogFormat("[The Plunger Button #{0}] Correct response. Module solved.", moduleId);
@@ -221,17 +223,15 @@ public class plungerButtonScript : MonoBehaviour
                 yield return true;
             button.OnInteract();
         }
-        while (GetSecond() != targetReleaseTime)
+        if (!heldCorrectly)
         {
-            if (timeOfPress != targetPressTime)
-            {
-                // The module is in an unsolvable state and so we panic and halt the autosolver.
-                // In TP terms this just means HandlePass and yield break.
-                PanicAtThe();
-                yield break;
-            }
-            yield return null;
+            // The module is in an unsolvable state and so we panic and halt the autosolver.
+            // In TP terms this just means HandlePass and yield break.
+            PanicAtThe();
+            yield break;
         }
+        while (GetSecond() != targetReleaseTime)
+            yield return null;
         button.OnInteractEnded();
     }
 }
