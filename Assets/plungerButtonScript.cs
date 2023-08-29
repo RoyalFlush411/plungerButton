@@ -222,14 +222,15 @@ public class plungerButtonScript : MonoBehaviour
             button.OnInteract();
         }
         while (GetSecond() != targetReleaseTime)
-            yield return true;
-        if (timeOfPress != targetPressTime)
         {
-            // The module is in an unsolvable state and so we panic and halt the autosolver.
-            // In TP terms this just means HandlePass and yield break.
-            // Apologies for the unnecessary Panic at the Disco reference
-            PanicAtThe();
-            yield break;
+            if (timeOfPress != targetPressTime)
+            {
+                // The module is in an unsolvable state and so we panic and halt the autosolver.
+                // In TP terms this just means HandlePass and yield break.
+                PanicAtThe();
+                yield break;
+            }
+            yield return null;
         }
         button.OnInteractEnded();
     }
