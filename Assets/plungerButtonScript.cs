@@ -149,9 +149,10 @@ public class plungerButtonScript : MonoBehaviour
 
     void PanicAtThe()
     {
-        Debug.LogFormat("<The Plunger Button #{0}> The module has been prematurely solved.");
+        Debug.LogFormat("<The Plunger Button #{0}> The module has been prematurely solved.", moduleId);
         moduleSolved = true;
         module.HandlePass();
+        surface.material = blackMat;
         StopAllCoroutines();
     }
 
