@@ -12,8 +12,6 @@ public class plungerButtonScript : MonoBehaviour
     public KMSelectable button;
     public Animator buttonAnimation;
     public GameObject materialCubes;
-
-    private int solvedModules = 0;
     private float timeOfPress = 0f;
     private float timeOfRelease = 0f;
     public int[] pressTimeOptionsLit;
@@ -26,9 +24,9 @@ public class plungerButtonScript : MonoBehaviour
     private int targetPressTime = 0;
     private int targetReleaseTime = 0;
     private bool pressed;
-    private bool heldCorrectly;
 
     private KMBombModule module;
+    private KMAudio audio;
 
     public Material[] discoColours;
     public Renderer surface;
@@ -38,6 +36,7 @@ public class plungerButtonScript : MonoBehaviour
     static int moduleIdCounter = 1;
     int moduleId;
     private bool moduleSolved;
+    private int rule;
 
     void Awake()
     {
@@ -45,52 +44,7 @@ public class plungerButtonScript : MonoBehaviour
         button.OnInteract += delegate () { PressButton(); return false; };
         button.OnInteractEnded += delegate () { ReleaseButton();};
         module = GetComponent<KMBombModule>();
-    }
-
-    void Update()
-    {
-        solvedModules = (Bomb.GetSolvedModuleNames().Count()) % 10;
-        if(lit > unlit)
-        {
-            for(int i = 0; i <= 9; i++)
-            {
-                if(solvedModules == i)
-                {
-                    targetPressTime = pressTimeOptionsLit[i];
-                }
-            }
-        }
-        else
-        {
-            for(int i = 0; i <= 9; i++)
-            {
-                if(solvedModules == i)
-                {
-                    targetPressTime = pressTimeOptionsUnlit[i];
-                }
-            }
-        }
-
-        if(unlit > lit)
-        {
-            for(int i = 0; i <= 9; i++)
-            {
-                if(solvedModules == i)
-                {
-                    targetReleaseTime = releaseTimeOptionsUnlit[i];
-                }
-            }
-        }
-        else
-        {
-            for(int i = 0; i <= 9; i++)
-            {
-                if(solvedModules == i)
-                {
-                    targetReleaseTime = releaseTimeOptionsLit[i];
-                }
-            }
-        }
+        audio = GetComponent<KMAudio>();
     }
 
     void Start()
@@ -98,18 +52,36 @@ public class plungerButtonScript : MonoBehaviour
         materialCubes.SetActive(false);
         unlit = Bomb.GetOffIndicators().Count();
         lit = Bomb.GetOnIndicators().Count();
-        if(unlit > lit)
-        {
-            Debug.LogFormat("[The Plunger Button #{0}] Unlit ({1}) > lit ({2}).", moduleId, unlit, lit);
-        }
-        else if(lit > unlit)
-        {
-            Debug.LogFormat("[The Plunger Button #{0}] Lit ({1}) > unlit ({2}).", moduleId, lit, unlit);
-        }
-        else
-        {
-            Debug.LogFormat("[The Plunger Button #{0}] Lit ({1}) = unlit ({2}).", moduleId, lit, unlit);
-        }
+        // negative returns -1, equal returns 0, positive returns 1
+        rule = Math.Sign(lit - unlit) + 1;
+        var sym = new [] { "<", "=", ">" };
+        Debug.LogFormat("[The Plunger Button #{0}] Lit ({2}) {1} unlit ({3}).", moduleId, sym[rule], unlit, lit);
+    }
+
+    int SolvedModules() 
+    {
+        return Bomb.GetSolvedModuleNames().Count() % 10;
+    }
+
+    int GetSecond()
+    {
+        return Mathf.FloorToInt(Bomb.GetTime() % 60 % 10);
+    }
+
+    int TargetHold(int s)
+    {
+        // lit > unlit
+        if (rule == 2)
+            return pressTimeOptionsLit[s];
+        return pressTimeOptionsUnlit[s];
+    }
+
+    int TargetRelease(int s)
+    {
+        // unlit > lit
+        if (rule == 0)
+            return releaseTimeOptionsUnlit[s];
+        return releaseTimeOptionsLit[s];
     }
 
     public void PressButton()
@@ -118,11 +90,11 @@ public class plungerButtonScript : MonoBehaviour
         {
             return;
         }
-        GetComponent<KMAudio>().PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.BigButtonPress, transform);
-        GetComponent<KMSelectable>().AddInteractionPunch();
-        timeOfPress = (Bomb.GetTime() % 60) % 10;
-        timeOfPress = Mathf.FloorToInt(timeOfPress);
-        heldCorrectly = timeOfPress == targetPressTime;
+        var solvedModules = SolvedModules();
+        audio.PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.BigButtonPress, transform);
+        button.AddInteractionPunch();
+        timeOfPress = GetSecond();
+        targetPressTime = TargetHold(solvedModules);
         Debug.LogFormat("[The Plunger Button #{0}] Current solved modules: {1}. Target press time: {2}. Actual press time: {3}.", moduleId, solvedModules, targetPressTime, timeOfPress);
         buttonAnimation.SetBool("release", false);
         buttonAnimation.SetBool("press", true);
@@ -136,10 +108,11 @@ public class plungerButtonScript : MonoBehaviour
         {
             return;
         }
-        GetComponent<KMAudio>().PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.BigButtonRelease, transform);
-        GetComponent<KMSelectable>().AddInteractionPunch();
-        timeOfRelease = (Bomb.GetTime() % 60) % 10;
-        timeOfRelease = Mathf.FloorToInt(timeOfRelease);
+        var solvedModules = SolvedModules();
+        audio.PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.BigButtonRelease, transform);
+        button.AddInteractionPunch();
+        timeOfRelease = GetSecond();
+        targetReleaseTime = TargetRelease(solvedModules);
         Debug.LogFormat("[The Plunger Button #{0}] Current solved modules modulo 10: {1}. Target release time: {2}. Actual release time: {3}.", moduleId, solvedModules, targetReleaseTime, timeOfRelease);
         buttonAnimation.SetBool("press", false);
         buttonAnimation.SetBool("release", true);
@@ -169,7 +142,7 @@ public class plungerButtonScript : MonoBehaviour
 
     void CheckInput()
     {
-        if(heldCorrectly && targetReleaseTime == timeOfRelease)
+        if(targetPressTime == timeOfPress && targetReleaseTime == timeOfRelease)
         {
             moduleSolved = true;
             Debug.LogFormat("[The Plunger Button #{0}] Correct response. Module solved.", moduleId);
@@ -200,16 +173,13 @@ public class plungerButtonScript : MonoBehaviour
         }
         yield return null;
         var time = match.Success ? match.Groups[2].Value : chainMatch.Groups[2].Value;
-        Func<bool> doesTimeMatch = () => Mathf.FloorToInt(Bomb.GetTime() % 60 % 10) == int.Parse(time);
-        while (!doesTimeMatch())
-        {
+        while (GetSecond() != int.Parse(time))
             yield return string.Format("trycancel The Plunger Button was not {0} due to a request to cancel.", pressed ? "released" : "held");
-        }
         if (chainMatch.Success)
         {
             yield return button;
             time = chainMatch.Groups[3].Value;
-            while (!doesTimeMatch())
+            while (GetSecond() != int.Parse(time))
                 yield return string.Format("trycancel The Plunger Button was not released due to a request to cancel.");
         }
         yield return button;
@@ -217,22 +187,21 @@ public class plungerButtonScript : MonoBehaviour
 
     IEnumerator TwitchHandleForcedSolve()
     {
-        Func<int> GetSecond = () => Mathf.FloorToInt(Bomb.GetTime() % 60 % 10);
         if (!pressed)
         {
-            while (GetSecond() != targetPressTime)
+            while (GetSecond() != TargetHold(SolvedModules()))
                 yield return true;
             button.OnInteract();
         }
-        if (!heldCorrectly)
+        if (timeOfPress != targetPressTime)
         {
             // The module is in an unsolvable state and so we panic and halt the autosolver.
             // In TP terms this just means HandlePass and yield break.
             PanicAtThe();
             yield break;
         }
-        while (GetSecond() != targetReleaseTime)
-            yield return null;
+        while (GetSecond() != TargetRelease(SolvedModules()))
+            yield return true;
         button.OnInteractEnded();
     }
 }
